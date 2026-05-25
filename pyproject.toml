@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spriteworkflow"
+version = "0.1.0"
+description = "Simple video to spritesheet workflow library."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+[project.urls]
+Homepage = "https://github.com/jhonvillanueva-hash/spriteworkflow"
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+authors = [
+    { name = "jhonvillanueva-hash", email = "jhon.villanueva.lozano.v@gmail.com" }
+]
+
+dependencies = [
+    "opencv-python>=4.8.0",
+    "pillow>=10.0.0"
+]
+
+[project.scripts]
+spriteworkflow = "spriteworkflow.cli:main"
