@@ -8,14 +8,10 @@ version = "0.1.0"
 description = "Simple video to spritesheet workflow library."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
-
-[project.urls]
-Homepage = "https://github.com/jhonvillanueva-hash/spriteworkflow"
+license = "MIT"
 
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 
@@ -25,8 +21,15 @@ authors = [
 
 dependencies = [
     "opencv-python>=4.8.0",
-    "pillow>=10.0.0"
+    "pillow>=10.0.0",
+    "imageio-ffmpeg>=0.6.0"
 ]
+
+[project.urls]
+Homepage = "https://github.com/jhonvillanueva-hash/spriteworkflow"
 
 [project.scripts]
 spriteworkflow = "spriteworkflow.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["spriteworkflow"]
