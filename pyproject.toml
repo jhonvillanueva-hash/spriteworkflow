@@ -31,6 +31,9 @@ dev = ["pytest>=7.0"]
 
 [project.urls]
 Homepage = "https://github.com/jhonvillanueva-hash/spriteworkflow"
+Repository = "https://github.com/jhonvillanueva-hash/spriteworkflow"
+Issues = "https://github.com/jhonvillanueva-hash/spriteworkflow/issues"
+Changelog = "https://github.com/jhonvillanueva-hash/spriteworkflow/releases"
 
 [project.scripts]
 spriteworkflow = "spriteworkflow.cli:main"
