@@ -57,18 +57,45 @@ class TestExtraction:
         )
         return fake_temp
 
+    @staticmethod
+    def _mockear_subprocess_run(monkeypatch):
+        """Mockea subprocess.run y retorna lista de (args, kwargs) por llamada."""
+        captured = []
+        monkeypatch.setattr(
+            "subprocess.run",
+            lambda *args, **kwargs: captured.append((args, kwargs)),
+        )
+        return captured
+
+    @staticmethod
+    def _assert_comando_ffmpeg(captured, ffmpeg_path, video_path, output_dir):
+        """Verifica que subprocess.run fue llamado con el comando ffmpeg esperado."""
+        assert len(captured) == 1, "Se esperaba exactamente 1 llamada a subprocess.run"
+        call_args, call_kwargs = captured[0]
+        cmd = call_args[0]
+
+        assert cmd == [
+            ffmpeg_path,
+            "-v",
+            "error",
+            "-i",
+            str(video_path),
+            str(output_dir / "frame_%04d.png"),
+        ]
+        assert call_kwargs == {"check": True, "stderr": subprocess.PIPE, "text": True}
+
     # ------------------------------------------------------------------
     # Camino feliz
     # ------------------------------------------------------------------
 
     def test_extraccion_exitosa_retorna_frames_ordenados(self, tmp_path, monkeypatch):
-        """FFmpeg simulado: crea frames PNG falsos y verifica que se devuelvan ordenados."""
+        """FFmpeg simulado: crea frames PNG falsos, verifica comando y frames ordenados."""
         video = self._crear_video_valido(tmp_path)
         monkeypatch.setattr(
             "spriteworkflow.extractor.get_ffmpeg_path", lambda: "/fake/ffmpeg"
         )
         fake_temp = self._mockear_mkdtemp(monkeypatch, tmp_path)
-        monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: None)
+        captured = self._mockear_subprocess_run(monkeypatch)
 
         # Crear frames esperados
         for i in range(4):
@@ -77,6 +104,10 @@ class TestExtraction:
 
         frames = extract_frames(str(video), output_dir=str(tmp_path))
 
+        # Verificar comando ffmpeg
+        self._assert_comando_ffmpeg(captured, "/fake/ffmpeg", video, fake_temp)
+
+        # Verificar frames devueltos
         assert len(frames) == 4
         for i, f in enumerate(frames):
             assert f.name == f"frame_{i+1:04d}.png", f"Frame {i} desordenado"
@@ -84,18 +115,23 @@ class TestExtraction:
         assert all(isinstance(f, Path) for f in frames)
 
     def test_extraccion_exitosa_con_un_solo_frame(self, tmp_path, monkeypatch):
-        """Un solo frame también funciona."""
+        """Un solo frame también funciona; verifica comando ffmpeg."""
         video = self._crear_video_valido(tmp_path)
         monkeypatch.setattr(
             "spriteworkflow.extractor.get_ffmpeg_path", lambda: "/fake/ffmpeg"
         )
         fake_temp = self._mockear_mkdtemp(monkeypatch, tmp_path)
-        monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: None)
+        captured = self._mockear_subprocess_run(monkeypatch)
 
         img = Image.new("RGBA", (32, 32), (0, 255, 0, 255))
         img.save(fake_temp / "frame_0001.png")
 
         frames = extract_frames(str(video), output_dir=str(tmp_path))
+
+        # Verificar comando ffmpeg
+        self._assert_comando_ffmpeg(captured, "/fake/ffmpeg", video, fake_temp)
+
+        # Verificar frame único
         assert len(frames) == 1
         assert frames[0].name == "frame_0001.png"
 
@@ -127,7 +163,9 @@ class TestExtraction:
             "spriteworkflow.extractor.get_ffmpeg_path", lambda: "/fake/ffmpeg"
         )
         self._mockear_mkdtemp(monkeypatch, tmp_path)
-        monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: None)
+        # Usamos el helper de captura en vez del lambda ciego aunque no
+        # verifiquemos asserts aquí — consistencia y mantenibilidad.
+        self._mockear_subprocess_run(monkeypatch)
 
         # No creamos frames → glob vacío
         with pytest.raises(RuntimeError, match="No frames were extracted"):
