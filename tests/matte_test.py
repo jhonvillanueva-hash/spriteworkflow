@@ -213,3 +213,92 @@ class TestIO:
         assert isinstance(out, list)
         assert all(isinstance(p, Path) for p in out)
         assert out == sorted(out)
+
+
+# ---------------------------------------------------------------------------
+# Feather — suavizado lineal de bordes (only new, never modify existing)
+# ---------------------------------------------------------------------------
+
+class TestFeather:
+    BG = (0, 255, 0)
+    SUBJECT = (255, 0, 0)
+
+    def test_feather_0_produce_mismo_resultado_que_sin_feather(self, tmp_path):
+        """Regresión: feather=0 debe dar exactamente el mismo alpha que el default."""
+        paths = create_chroma_key_frames(
+            tmp_path / "src", count=1, size=(64, 64),
+            bg_color=self.BG, subject_color=self.SUBJECT, subject_radius=10,
+        )
+        out_default = remove_background(frames=paths, bg_color=self.BG, tolerance=30,
+                                        output_dir=str(tmp_path / "default"))
+        out_feather0 = remove_background(frames=paths, bg_color=self.BG, tolerance=30, feather=0,
+                                         output_dir=str(tmp_path / "feather0"))
+
+        img_d = Image.open(out_default[0])
+        img_f = Image.open(out_feather0[0])
+
+        for y in range(64):
+            for x in range(64):
+                assert img_d.getpixel((x, y)) == img_f.getpixel((x, y)), \
+                    f"diferencia en ({x},{y})"
+
+    def test_feather_alpha_intermedio_en_medio_de_la_rampa(self, tmp_path):
+        """Feather>0: pixel con dist exactamente en el centro de la rampa debe tener
+        alpha ≈ 127.5 (truncado a 127, tolerancia ±5)."""
+        bg = (0, 255, 0)
+        feather = 20
+        tolerance = 30
+        lower = max(0, tolerance - feather)  # 10
+        upper = tolerance + feather          # 50
+        # Midpoint distance = (10 + 50) / 2 = 30
+        # Pixel (0, 225, 0) → distancia = 30
+        mid_color = (0, 225, 0)
+
+        size = (64, 64)
+        img = Image.new("RGBA", size, bg + (255,))
+        img.putpixel((32, 32), mid_color + (255,))
+        frame = tmp_path / "mid.png"
+        img.save(frame)
+
+        out = remove_background(frames=[frame], bg_color=bg, tolerance=tolerance,
+                                feather=feather, output_dir=str(tmp_path / "out"))
+        result = Image.open(out[0])
+        alpha = result.getpixel((32, 32))[3]
+        assert 122 <= alpha <= 132, f"Se esperaba alpha ~127, obtuve {alpha}"
+
+    def test_feather_extremos_0_y_255_se_mantienen(self, tmp_path):
+        """Feather>0: pixel muy por debajo → alpha=0; muy por encima → alpha=255."""
+        bg = (0, 255, 0)
+        feather = 10
+        tolerance = 20
+
+        size = (64, 64)
+        img = Image.new("RGBA", size, bg + (255,))
+        # exactamente bg_color → dist=0, muy por debajo de (tolerance-feather)=10
+        img.putpixel((10, 10), bg + (255,))
+        # rojo puro → dist≈360, muy por encima de (tolerance+feather)=30
+        img.putpixel((20, 20), (255, 0, 0, 255))
+        frame = tmp_path / "extreme.png"
+        img.save(frame)
+
+        out = remove_background(frames=[frame], bg_color=bg, tolerance=tolerance,
+                                feather=feather, output_dir=str(tmp_path / "out"))
+        result = Image.open(out[0])
+        assert result.getpixel((10, 10))[3] == 0, "muy cerca del bg → alpha=0"
+        assert result.getpixel((20, 20))[3] == 255, "muy lejos del bg → alpha=255"
+
+    def test_lanza_value_error_si_feather_es_negativo(self, tmp_path):
+        """Feather negativo debe lanzar ValueError."""
+        frame = tmp_path / "f.png"
+        Image.new("RGBA", (8, 8), (0, 255, 0, 255)).save(frame)
+        with pytest.raises(ValueError, match="feather must be a non-negative integer"):
+            remove_background(frames=[frame], bg_color=(0, 255, 0), feather=-1,
+                              output_dir=str(tmp_path / "out"))
+
+    def test_lanza_value_error_si_feather_no_es_entero(self, tmp_path):
+        """Feather no-entero debe lanzar ValueError."""
+        frame = tmp_path / "f.png"
+        Image.new("RGBA", (8, 8), (0, 255, 0, 255)).save(frame)
+        with pytest.raises(ValueError, match="feather must be a non-negative integer"):
+            remove_background(frames=[frame], bg_color=(0, 255, 0), feather=1.5,
+                              output_dir=str(tmp_path / "out"))

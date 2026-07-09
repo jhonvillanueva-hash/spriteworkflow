@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 
 
-def remove_background(frames=None, frames_dir=None, bg_color=None, tolerance=30, output_dir="matted"):
+def remove_background(frames=None, frames_dir=None, bg_color=None, tolerance=30, feather=0, output_dir="matted"):
     """Remove background from frames via chroma-key (euclidean distance in RGB).
 
     Parameters
@@ -20,6 +20,12 @@ def remove_background(frames=None, frames_dir=None, bg_color=None, tolerance=30,
     tolerance : int
         Maximum euclidean distance from *bg_color* for a pixel to be
         considered background (made transparent). Default 30.
+    feather : int
+        Width of the linear feather ramp around *tolerance*. With
+        ``feather=0`` (default) the alpha mask is binary. With
+        ``feather > 0`` pixels whose distance falls inside the ramp
+        ``[tolerance - feather, tolerance + feather]`` get a smoothly
+        interpolated alpha value between 0 and 255.
     output_dir : Path or str
         Directory where the processed RGBA PNGs are saved. Created if it
         does not exist. Default ``"matted"``.
@@ -33,8 +39,9 @@ def remove_background(frames=None, frames_dir=None, bg_color=None, tolerance=30,
     ------
     ValueError
         If neither *frames* nor *frames_dir* is provided, if both are
-        provided, if *frames_dir* points to an empty directory, or if
-        *bg_color* is not a valid RGB triplet.
+        provided, if *frames_dir* points to an empty directory, if
+        *bg_color* is not a valid RGB triplet, or if *feather* is not a
+        non-negative integer.
     FileNotFoundError
         If *frames_dir* does not exist.
     NotADirectoryError
@@ -91,6 +98,12 @@ def remove_background(frames=None, frames_dir=None, bg_color=None, tolerance=30,
             raise ValueError("bg_color values must be integers in the range 0-255.")
 
     # ------------------------------------------------------------------
+    # Validación de feather
+    # ------------------------------------------------------------------
+    if not isinstance(feather, int) or feather < 0:
+        raise ValueError("feather must be a non-negative integer.")
+
+    # ------------------------------------------------------------------
     # Procesar cada frame
     # ------------------------------------------------------------------
     output_path = Path(output_dir)
@@ -114,8 +127,21 @@ def remove_background(frames=None, frames_dir=None, bg_color=None, tolerance=30,
         diff = rgb.astype(np.float32) - bg_array.astype(np.float32)
         dist = np.sqrt(np.sum(diff ** 2, axis=2))
 
-        # Alpha mask: 0 for background, 255 for foreground
-        alpha = np.where(dist <= tolerance, 0, 255).astype(np.uint8)
+        # Alpha mask: binary (feather=0) or linear ramp (feather>0)
+        if feather == 0:
+            alpha = np.where(dist <= tolerance, 0, 255).astype(np.uint8)
+        else:
+            lower = max(0, tolerance - feather)
+            upper = tolerance + feather
+            alpha = np.where(
+                dist <= lower,
+                np.uint8(0),
+                np.where(
+                    dist >= upper,
+                    np.uint8(255),
+                    ((dist - lower) / (upper - lower) * 255).astype(np.uint8),
+                ),
+            )
 
         rgba = np.dstack([rgb, alpha])
 
