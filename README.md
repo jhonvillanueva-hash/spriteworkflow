@@ -1,5 +1,7 @@
 # SpriteWorkflow
 
+[![Tests](https://github.com/jhonvillanueva-hash/spriteworkflow/actions/workflows/tests.yml/badge.svg)](https://github.com/jhonvillanueva-hash/spriteworkflow/actions/workflows/tests.yml)
+
 Biblioteca Python para convertir videos en spritesheets (hojas de sprites).
 Extrae fotogramas de un video, opcionalmente remueve el fondo por chroma-key,
 y los ensambla en un spritesheet lineal (horizontal) o en cuadrícula (grid).
